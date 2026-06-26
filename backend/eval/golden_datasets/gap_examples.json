@@ -1,0 +1,64 @@
+[
+  {
+    "input": {
+      "digest": {
+        "topic": "React 19 Release",
+        "summary": "React 19 released with Actions, use() hook, Server Components stable, React Compiler.",
+        "market_signal": "new_release",
+        "tools_versions": [{"tool": "React", "version": "19.0", "change_type": "major"}]
+      },
+      "curriculum": [
+        {"type": "session", "title": "Introduction to React", "content": "React 18 fundamentals, hooks, JSX"},
+        {"type": "project", "title": "Todo App", "content": "Built with React 18.2, create-react-app"},
+        {"type": "quiz", "title": "React Quiz", "content": "Questions about React 18 lifecycle and hooks"}
+      ]
+    },
+    "expected_output": {
+      "min_gaps": 1,
+      "expected_gap_types": ["version_gap"],
+      "must_mention": ["React 19", "React 18"],
+      "severity_range": ["critical", "high"]
+    }
+  },
+  {
+    "input": {
+      "digest": {
+        "topic": "Create React App Deprecated",
+        "summary": "CRA is officially deprecated. React recommends Next.js, Remix, or Vite.",
+        "market_signal": "deprecation",
+        "tools_versions": [{"tool": "create-react-app", "version": "5.0", "change_type": "deprecated"}]
+      },
+      "curriculum": [
+        {"type": "session", "title": "React Setup", "content": "Use npx create-react-app to bootstrap projects"},
+        {"type": "project", "title": "E-Commerce App", "content": "Bootstrapped with create-react-app"},
+        {"type": "coding_challenge", "title": "Setup Challenge", "content": "Create new React app using CRA"}
+      ]
+    },
+    "expected_output": {
+      "min_gaps": 1,
+      "expected_gap_types": ["tool_gap"],
+      "must_mention": ["create-react-app", "deprecated"],
+      "severity_range": ["critical", "high"]
+    }
+  },
+  {
+    "input": {
+      "digest": {
+        "topic": "ESLint 9 Flat Config",
+        "summary": "ESLint 9 uses flat config by default. .eslintrc files are deprecated.",
+        "market_signal": "breaking_change",
+        "tools_versions": [{"tool": "ESLint", "version": "9.0", "change_type": "major"}]
+      },
+      "curriculum": [
+        {"type": "session", "title": "Code Quality with ESLint", "content": "Configure ESLint with .eslintrc.json, extends, plugins"},
+        {"type": "project", "title": "Linting Setup", "content": "Create .eslintrc.json with recommended rules"}
+      ]
+    },
+    "expected_output": {
+      "min_gaps": 1,
+      "expected_gap_types": ["practice_gap", "tool_gap"],
+      "must_mention": ["flat config", ".eslintrc"],
+      "severity_range": ["medium", "high"]
+    }
+  }
+]

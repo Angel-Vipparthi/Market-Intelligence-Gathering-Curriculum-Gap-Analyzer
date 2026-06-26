@@ -1,0 +1,60 @@
+[
+  {
+    "input": {
+      "url": "https://react.dev/blog/2024/12/05/react-19",
+      "source_title": "React 19 Release Blog",
+      "source_type": "official_docs",
+      "content": "React 19 is now stable! This release includes Actions for handling async operations, the use() hook for reading resources, ref as a prop, improved hydration error reporting, and React Server Components are now stable."
+    },
+    "expected_output": {
+      "topic": "React 19 Release",
+      "market_signal": "new_release",
+      "confidence_min": 0.8,
+      "must_contain_tools": ["React"],
+      "must_contain_version": "19"
+    }
+  },
+  {
+    "input": {
+      "url": "https://tailwindcss.com/blog/tailwindcss-v4",
+      "source_title": "Tailwind CSS v4.0",
+      "source_type": "official_docs",
+      "content": "Tailwind CSS v4.0 is a ground-up rewrite built on Oxide, a new high-performance engine. CSS-first configuration replaces tailwind.config.js. Container queries, 3D transforms, and wide-gamut colors built-in."
+    },
+    "expected_output": {
+      "topic": "Tailwind CSS v4",
+      "market_signal": "new_release",
+      "confidence_min": 0.8,
+      "must_contain_tools": ["Tailwind CSS"],
+      "must_contain_version": "4"
+    }
+  },
+  {
+    "input": {
+      "url": "https://vitejs.dev/blog/deprecation",
+      "source_title": "Vite CJS Deprecation",
+      "source_type": "official_docs",
+      "content": "The Vite CommonJS Node API has been deprecated. Please migrate to ESM. The require() calls to Vite APIs will stop working in Vite 6."
+    },
+    "expected_output": {
+      "topic": "Vite CJS Deprecation",
+      "market_signal": "deprecation",
+      "confidence_min": 0.7,
+      "must_contain_tools": ["Vite"]
+    }
+  },
+  {
+    "input": {
+      "url": "https://example.com/cooking-blog",
+      "source_title": "Best Pasta Recipes",
+      "source_type": "personal_blog",
+      "content": "Today we explore the best pasta recipes from Italy. From carbonara to cacio e pepe, these recipes will delight your taste buds."
+    },
+    "expected_output": {
+      "topic": "Cooking/Pasta",
+      "market_signal": "any",
+      "confidence_max": 0.3,
+      "must_contain_tools": []
+    }
+  }
+]

@@ -1,0 +1,91 @@
+description: "Gap Analyzer Evaluation Suite"
+
+prompts:
+  - file://../prompts/gap_detector_v1.txt
+
+providers:
+  - id: openrouter:anthropic/claude-sonnet-4
+    config:
+      max_tokens: 4096
+      temperature: 0
+
+tests:
+  - description: "React 19 vs React 18 curriculum detects version gap"
+    vars:
+      market_signal: "new_release"
+      topic: "React 19"
+      summary: "React 19 released with Actions, use() hook, React Compiler, and stable Server Components."
+      evidence_snippet: "React 19 is now stable with breaking changes to the API."
+      tools_versions: '[{"tool": "React", "version": "19.0", "change_type": "major"}]'
+      curriculum_context: |
+        [session] Introduction to React: Covers React 18 fundamentals including hooks, state, props. Uses create-react-app.
+        [project] Todo App: Built with React 18.2, uses class components and functional components.
+        [quiz] React Basics Quiz: Tests knowledge of React 18 lifecycle methods and hooks.
+        [assessment] React Assessment: Evaluates React 18 patterns including useEffect, useState.
+    assert:
+      - type: is-json
+      - type: javascript
+        value: "JSON.parse(output).length > 0"
+      - type: javascript
+        value: "JSON.parse(output).some(g => g.gap_type === 'version_gap')"
+      - type: javascript
+        value: "JSON.parse(output).every(g => g.gap_statement && g.gap_statement.length > 10)"
+      - type: javascript
+        value: "JSON.parse(output).every(g => g.curriculum_evidence && g.curriculum_evidence.length > 5)"
+
+  - description: "No false gaps when curriculum is up to date"
+    vars:
+      market_signal: "new_release"
+      topic: "React 19"
+      summary: "React 19 released with Actions and use() hook."
+      evidence_snippet: "React 19 is stable."
+      tools_versions: '[{"tool": "React", "version": "19.0", "change_type": "major"}]'
+      curriculum_context: |
+        [session] Introduction to React 19: Covers React 19 features including Actions, use() hook, Server Components.
+        [project] Modern React App: Built with React 19, uses the new React Compiler.
+        [quiz] React 19 Quiz: Tests knowledge of Actions, Server Components, and use() hook.
+    assert:
+      - type: is-json
+      - type: javascript
+        value: "JSON.parse(output).length === 0 || JSON.parse(output).every(g => g.gap_type !== 'version_gap')"
+
+  - description: "Deprecation detected correctly"
+    vars:
+      market_signal: "deprecation"
+      topic: "Create React App Deprecated"
+      summary: "Create React App is officially deprecated. React team recommends using Next.js, Remix, or Vite for new projects."
+      evidence_snippet: "CRA is no longer maintained and will not receive updates."
+      tools_versions: '[{"tool": "create-react-app", "version": "5.0", "change_type": "deprecated"}]'
+      curriculum_context: |
+        [session] Setting Up React: Uses create-react-app to bootstrap React projects.
+        [project] E-Commerce App: Bootstrapped with create-react-app.
+        [coding_challenge] React Setup Challenge: Students must use npx create-react-app to start.
+    assert:
+      - type: is-json
+      - type: javascript
+        value: "JSON.parse(output).length > 0"
+      - type: javascript
+        value: "JSON.parse(output).some(g => g.gap_type === 'tool_gap')"
+      - type: javascript
+        value: "JSON.parse(output).every(g => g.what_to_act && g.what_to_act.length > 5)"
+      - type: javascript
+        value: "JSON.parse(output).every(g => g.why_to_act && g.why_to_act.length > 5)"
+
+  - description: "Gap output has all required fields"
+    vars:
+      market_signal: "best_practice_change"
+      topic: "Testing Library best practices update"
+      summary: "React Testing Library recommends using userEvent over fireEvent. New best practices for async testing."
+      evidence_snippet: "userEvent is now the recommended way to simulate user interactions."
+      tools_versions: '[{"tool": "React Testing Library", "version": "15.0", "change_type": "major"}]'
+      curriculum_context: |
+        [session] Testing React Components: Teaches fireEvent from React Testing Library for simulating clicks.
+        [assessment] Testing Assessment: Tests knowledge of fireEvent patterns.
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          JSON.parse(output).every(g =>
+            g.gap_statement && g.gap_type && g.curriculum_evidence &&
+            g.market_signal && g.what_to_act && g.why_to_act
+          )

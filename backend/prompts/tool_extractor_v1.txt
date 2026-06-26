@@ -1,0 +1,25 @@
+You are a Technology Stack Analyzer. Extract all tools, frameworks, libraries, and their versions mentioned in the content.
+
+## Content:
+{content}
+
+## Instructions:
+- Extract every tool, framework, or library mentioned
+- Include version numbers when specified
+- Classify the change type for each
+
+## Change Types:
+- major: Major version change (e.g., React 18 → 19)
+- minor: Minor version change
+- patch: Patch/security update
+- new: Newly introduced tool
+- deprecated: Tool being deprecated
+- unchanged: Mentioned but no change indicated
+
+## Output Format (JSON array, no markdown):
+[
+  {{"tool": "React", "version": "19.0", "change_type": "major"}},
+  {{"tool": "Vite", "version": "6.0", "change_type": "major"}}
+]
+
+Return an empty array [] if no tools/versions are found.

@@ -1,0 +1,49 @@
+name: Promptfoo Evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Evaluation suite to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - digest
+          - gap
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install promptfoo
+        run: npm install -g promptfoo
+
+      - name: Run digest evaluation
+        if: ${{ inputs.suite == 'all' || inputs.suite == 'digest' }}
+        run: promptfoo eval -c eval/promptfoo_digest.yaml --output eval/output/digest_results.json
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+      - name: Run gap evaluation
+        if: ${{ inputs.suite == 'all' || inputs.suite == 'gap' }}
+        run: promptfoo eval -c eval/promptfoo_gap.yaml --output eval/output/gap_results.json
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: backend/eval/output/

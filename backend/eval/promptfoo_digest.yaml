@@ -1,0 +1,84 @@
+description: "Digest Agent Evaluation Suite"
+
+prompts:
+  - file://../prompts/digest_generator_v1.txt
+
+providers:
+  - id: openrouter:anthropic/claude-sonnet-4
+    config:
+      max_tokens: 4096
+      temperature: 0
+
+tests:
+  - description: "React 19 release blog generates valid digest"
+    vars:
+      content: "React 19 is now stable! This release includes new features like Actions, use() hook, ref as prop, and improved hydration error reporting. React Server Components are now stable. The new compiler (React Compiler) optimizes re-renders automatically."
+      url: "https://react.dev/blog/2024/12/05/react-19"
+      source_title: "React 19 Release Blog"
+      source_type: "official_docs"
+    assert:
+      - type: is-json
+      - type: javascript
+        value: "JSON.parse(output).topic.toLowerCase().includes('react')"
+      - type: javascript
+        value: "['new_release','breaking_change'].includes(JSON.parse(output).market_signal)"
+      - type: javascript
+        value: "JSON.parse(output).confidence >= 0.7"
+      - type: javascript
+        value: "JSON.parse(output).summary.length > 20"
+      - type: javascript
+        value: "JSON.parse(output).evidence_snippet.length > 10"
+      - type: not-contains
+        value: "I don't know"
+
+  - description: "Tailwind CSS v4 changelog generates valid digest"
+    vars:
+      content: "Tailwind CSS v4.0 is here. Built on a new high-performance engine, Oxide. New CSS-first configuration with @theme instead of tailwind.config.js. Container queries, 3D transforms, and wide-gamut colors are now built-in. Zero-configuration content detection."
+      url: "https://tailwindcss.com/blog/tailwindcss-v4"
+      source_title: "Tailwind CSS v4.0"
+      source_type: "official_docs"
+    assert:
+      - type: is-json
+      - type: javascript
+        value: "JSON.parse(output).topic.toLowerCase().includes('tailwind')"
+      - type: javascript
+        value: "JSON.parse(output).market_signal === 'new_release'"
+      - type: javascript
+        value: "JSON.parse(output).confidence >= 0.7"
+
+  - description: "Irrelevant content gets low confidence"
+    vars:
+      content: "Today we released our new line of organic dog treats. Made with 100% natural ingredients, our treats are perfect for your furry friends. Available in chicken, beef, and salmon flavors."
+      url: "https://example.com/dog-treats"
+      source_title: "New Dog Treats"
+      source_type: "personal_blog"
+    assert:
+      - type: is-json
+      - type: javascript
+        value: "JSON.parse(output).confidence < 0.4"
+
+  - description: "Vite deprecation notice generates correct signal"
+    vars:
+      content: "Vite 5 has officially deprecated the CommonJS API. Users must migrate to ESM. The legacy plugin has been removed. Vite 6 will drop CJS support entirely. Migration guide available at vitejs.dev/guide/migration."
+      url: "https://vitejs.dev/blog/deprecation"
+      source_title: "Vite CJS Deprecation"
+      source_type: "official_docs"
+    assert:
+      - type: is-json
+      - type: javascript
+        value: "['deprecation','breaking_change'].includes(JSON.parse(output).market_signal)"
+      - type: javascript
+        value: "JSON.parse(output).confidence >= 0.7"
+
+  - description: "Output never contains hallucinated URLs"
+    vars:
+      content: "Next.js 15 introduces Partial Prerendering, which combines static and dynamic rendering in a single route. It also ships with improved caching semantics and Turbopack as the default dev bundler."
+      url: "https://nextjs.org/blog/next-15"
+      source_title: "Next.js 15"
+      source_type: "official_docs"
+    assert:
+      - type: is-json
+      - type: not-contains
+        value: "http"
+      - type: javascript
+        value: "!JSON.parse(output).evidence_snippet.includes('http')"

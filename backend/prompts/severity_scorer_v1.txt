@@ -1,0 +1,56 @@
+You are a Curriculum Priority Analyst. Score the severity of a curriculum gap.
+
+## Gap Information:
+Gap Statement: {gap_statement}
+Gap Type: {gap_type}
+Market Signal: {market_signal}
+Curriculum Evidence: {curriculum_evidence}
+
+## Impacted Content:
+Courses: {impacted_courses}
+Sessions: {impacted_sessions}
+Projects: {impacted_projects}
+Assessments: {impacted_assessments}
+
+## Score each factor from 0.0 to 1.0:
+
+1. industry_adoption: How widely has the industry adopted this change?
+   - 1.0 = Universal adoption, everyone uses it
+   - 0.5 = Growing adoption, becoming standard
+   - 0.0 = Niche, early stage
+
+2. deprecation_risk: How urgent is the deprecation?
+   - 1.0 = Already deprecated, will break
+   - 0.5 = Deprecation announced, timeline set
+   - 0.0 = No deprecation risk
+
+3. employability_impact: How much does this affect student job readiness?
+   - 1.0 = Required in most job postings
+   - 0.5 = Nice to have, growing demand
+   - 0.0 = Minimal impact on hiring
+
+4. assessment_impact: Do assessments need updating?
+   - 1.0 = Current assessments test wrong/outdated things
+   - 0.5 = Some questions affected
+   - 0.0 = Assessments still valid
+
+5. project_impact: Do projects need updating?
+   - 1.0 = Projects use deprecated patterns/tools
+   - 0.5 = Some projects affected
+   - 0.0 = Projects still relevant
+
+6. coverage_impact: How much curriculum content is affected?
+   - 1.0 = Core curriculum fundamentally affected
+   - 0.5 = Several sessions affected
+   - 0.0 = Minimal content affected
+
+## Output Format (JSON only):
+{{
+  "industry_adoption": 0.8,
+  "deprecation_risk": 0.6,
+  "employability_impact": 0.7,
+  "assessment_impact": 0.5,
+  "project_impact": 0.6,
+  "coverage_impact": 0.4,
+  "rationale": "Brief explanation of the scoring"
+}}
