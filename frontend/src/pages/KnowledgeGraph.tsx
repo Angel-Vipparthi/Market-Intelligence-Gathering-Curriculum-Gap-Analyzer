@@ -34,32 +34,45 @@ interface GraphData {
 const TYPE_COLORS: Record<string, string> = {
   course: '#3b82f6',
   module: '#8b5cf6',
-  session: '#10b981',
-  project: '#f59e0b',
+  topic: '#10b981',
   tool: '#ef4444',
+  session: '#f59e0b',
+  project: '#06b6d4',
   version: '#ec4899',
-  coding_challenge: '#06b6d4',
-  quiz: '#84cc16',
-  tool_registry: '#f97316',
+  coding_challenge: '#84cc16',
+  quiz: '#f97316',
+  tool_registry: '#a855f7',
 }
 
 const NODE_RADIUS: Record<string, number> = {
-  course: 14,
-  module: 10,
+  course: 16,
+  module: 12,
+  topic: 6,
   tool: 8,
-  project: 7,
   session: 5,
+  project: 5,
   version: 4,
   coding_challenge: 4,
   quiz: 4,
-  tool_registry: 6,
+  tool_registry: 5,
 }
 
-function useGraph() {
+function useCourses() {
   return useQuery({
-    queryKey: ['graph'],
+    queryKey: ['graph-courses'],
     queryFn: async () => {
-      const { data } = await api.get('/graph')
+      const { data } = await api.get('/graph/courses')
+      return data.courses as string[]
+    },
+  })
+}
+
+function useGraph(course: string) {
+  return useQuery({
+    queryKey: ['graph', course],
+    queryFn: async () => {
+      const params = course ? { course } : {}
+      const { data } = await api.get('/graph', { params })
       return data as GraphData
     },
   })
@@ -77,7 +90,9 @@ function useToolImpact(toolName: string) {
 }
 
 export default function KnowledgeGraph() {
-  const { data, isLoading } = useGraph()
+  const [selectedCourse, setSelectedCourse] = useState('')
+  const { data: courses } = useCourses()
+  const { data, isLoading } = useGraph(selectedCourse)
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const nodesRef = useRef<GraphNode[]>([])
@@ -387,6 +402,15 @@ export default function KnowledgeGraph() {
     <div className="flex h-full flex-col gap-3" style={{ minHeight: 0 }}>
       {/* Top bar */}
       <div className="flex flex-wrap items-center gap-3">
+        <select
+          value={selectedCourse}
+          onChange={(e) => setSelectedCourse(e.target.value)}
+          className="rounded-lg border px-3 py-1.5 text-sm font-medium"
+        >
+          <option value="">All Courses</option>
+          {(courses ?? []).map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <span className="text-xs text-gray-400">|</span>
         <span className="text-sm font-semibold text-gray-700">{data?.total_nodes} nodes</span>
         <span className="text-xs text-gray-400">|</span>
         <span className="text-sm font-semibold text-gray-700">{data?.total_edges} edges</span>

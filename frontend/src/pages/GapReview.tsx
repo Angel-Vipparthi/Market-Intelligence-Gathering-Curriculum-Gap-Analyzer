@@ -35,7 +35,7 @@ function GapProgressModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={allDone ? onClose : undefined} />
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-2xl mx-4 rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-white">
@@ -54,11 +54,9 @@ function GapProgressModal({
               </p>
             </div>
           </div>
-          {allDone && (
-            <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition">
-              <X className="h-4 w-4" />
-            </button>
-          )}
+          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition" title={allDone ? 'Close' : 'Run in background'}>
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Progress Bar */}
@@ -151,9 +149,13 @@ function GapProgressModal({
             <span><span className="font-bold text-slate-500">{progress?.items?.filter((i: GapBatchItem) => i.status === 'done' && i.gaps_found === 0).length ?? 0}</span> no gaps</span>
             <span><span className="font-bold text-amber-500">{total - completed}</span> remaining</span>
           </div>
-          {allDone && (
+          {allDone ? (
             <button onClick={onClose} className="rounded-lg bg-amber-600 px-4 py-1.5 text-[12px] font-semibold text-white shadow-sm hover:bg-amber-700 transition active:scale-[0.98]">
               Close & Review
+            </button>
+          ) : (
+            <button onClick={onClose} className="rounded-lg border border-slate-300 bg-white px-4 py-1.5 text-[12px] font-semibold text-slate-600 shadow-sm hover:bg-slate-50 transition active:scale-[0.98]">
+              Run in Background
             </button>
           )}
         </div>

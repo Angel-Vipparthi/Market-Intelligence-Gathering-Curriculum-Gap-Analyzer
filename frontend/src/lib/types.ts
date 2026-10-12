@@ -5,6 +5,7 @@ export interface URLEntry {
   source_name: string
   credibility_tier: string
   category: string
+  course_name: string | null
   tags: string[]
   is_active: boolean
   last_crawled_at: string | null

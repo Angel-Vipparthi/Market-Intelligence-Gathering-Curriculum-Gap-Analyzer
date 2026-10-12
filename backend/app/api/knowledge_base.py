@@ -1,6 +1,10 @@
+import csv
+import io
 import logging
 from datetime import datetime, timezone
+from urllib.parse import quote, urlparse
 
+import httpx
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
@@ -559,3 +563,308 @@ async def get_module_assessments(module_name: str = Query(...)):
         "coding": coding,
         "total": len(mcqs) + len(coding),
     }
+
+
+# ── Sheet config ───────────────────────────────────────────────────────
+
+class SheetConfig(BaseModel):
+    product_name: str
+    course_name: str
+    sheet_url: str
+
+class SheetConfigResponse(BaseModel):
+    id: str
+    product_name: str
+    course_name: str
+    sheet_url: str
+    spreadsheet_id: str
+    last_loaded_at: str | None = None
+
+
+def _extract_spreadsheet_id(url: str) -> str:
+    """Extract Google Sheets spreadsheet ID from URL."""
+    # https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/...
+    parts = urlparse(url)
+    path_parts = parts.path.split("/")
+    try:
+        d_idx = path_parts.index("d")
+        return path_parts[d_idx + 1]
+    except (ValueError, IndexError):
+        raise HTTPException(status_code=400, detail="Invalid Google Sheet URL — expected format: https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/...")
+
+
+def _fetch_sheet_csv(spreadsheet_id: str, tab_name: str) -> list[dict]:
+    """Fetch a single sheet tab as list of dicts."""
+    encoded = quote(tab_name)
+    url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/gviz/tq?tqx=out:csv&sheet={encoded}"
+    resp = httpx.get(url, follow_redirects=True, timeout=30)
+    resp.raise_for_status()
+    reader = csv.DictReader(io.StringIO(resp.text))
+    rows = []
+    for row in reader:
+        cleaned = {k.strip(): v.strip() for k, v in row.items() if k and k.strip()}
+        if any(v for v in cleaned.values()):
+            rows.append(cleaned)
+    return rows
+
+
+@router.get("/sheet-configs")
+async def list_sheet_configs(product_name: str | None = Query(None)):
+    """List saved sheet configurations."""
+    client = get_supabase_client()
+    query = client.table("kb_sheet_configs").select("*").eq("is_active", True)
+    if product_name:
+        query = query.eq("product_name", product_name)
+    result = query.order("course_name").execute()
+    return {"items": result.data or []}
+
+
+@router.post("/sheet-configs")
+async def save_sheet_config(payload: SheetConfig):
+    """Save a sheet URL for a course (upsert by product+course)."""
+    client = get_supabase_client()
+    spreadsheet_id = _extract_spreadsheet_id(payload.sheet_url)
+    data = {
+        "product_name": payload.product_name,
+        "course_name": payload.course_name,
+        "sheet_url": payload.sheet_url,
+        "spreadsheet_id": spreadsheet_id,
+    }
+    result = client.table("kb_sheet_configs").upsert(
+        data, on_conflict="product_name,course_name"
+    ).execute()
+    return result.data[0] if result.data else data
+
+
+@router.delete("/sheet-configs/{config_id}")
+async def delete_sheet_config(config_id: str):
+    client = get_supabase_client()
+    client.table("kb_sheet_configs").delete().eq("id", config_id).execute()
+    return {"status": "deleted"}
+
+
+@router.post("/load-from-sheet")
+async def load_from_sheet(payload: SheetConfig):
+    """Load knowledge base data from a Google Sheet for a specific course.
+
+    Expected sheet tabs: URLs, Course Outline, Projects Used, Tools and Versions,
+    Practice Content, Quiz Content, Gap Analysis Output.
+    Missing tabs are skipped silently.
+    """
+    client = get_supabase_client()
+    spreadsheet_id = _extract_spreadsheet_id(payload.sheet_url)
+    course_name = payload.course_name
+    product_name = payload.product_name
+    seed_marker = f"sheet_seed:{course_name}"
+
+    # Save/update config
+    client.table("kb_sheet_configs").upsert(
+        {
+            "product_name": product_name,
+            "course_name": course_name,
+            "sheet_url": payload.sheet_url,
+            "spreadsheet_id": spreadsheet_id,
+            "last_loaded_at": datetime.now(timezone.utc).isoformat(),
+        },
+        on_conflict="product_name,course_name",
+    ).execute()
+
+    results = {"urls": 0, "sessions": 0, "projects": 0, "tools": 0, "practice": 0, "quizzes": 0, "gaps": 0, "errors": []}
+
+    # Clear previous seed data for this course
+    try:
+        client.table("url_registry").delete().eq("added_by", seed_marker).execute()
+    except Exception:
+        pass
+    try:
+        client.table("curriculum_documents").delete().like("metadata->>seeded_by", seed_marker).execute()
+    except Exception:
+        pass
+    try:
+        client.table("curriculum_gaps").delete().eq("evidence_source", seed_marker).execute()
+    except Exception:
+        pass
+
+    # 1. URLs tab
+    try:
+        rows = _fetch_sheet_csv(spreadsheet_id, "URLs")
+        current_source_type = ""
+        for row in rows:
+            source_type = row.get("Source Type", "")
+            url = row.get("URLs", "") or row.get("URL", "")
+            if source_type:
+                current_source_type = source_type
+            if not url or not url.startswith("http"):
+                continue
+            domain = urlparse(url).netloc.lower()
+            tier = "unknown"
+            if any(d in domain for d in ["react.dev", "vite.dev", "vitejs.dev", "redux-toolkit.js.org", "reactrouter.com"]):
+                tier = "official_docs"
+            elif "npmjs.com" in domain:
+                tier = "tech_publication"
+            elif any(d in domain for d in ["github.com", "blog"]):
+                tier = "major_blog"
+            category = "frontend"
+            try:
+                client.table("url_registry").insert({
+                    "url": url, "domain": domain, "source_name": current_source_type,
+                    "credibility_tier": tier, "category": category, "is_active": True,
+                    "added_by": seed_marker, "course_name": course_name,
+                }).execute()
+                results["urls"] += 1
+            except Exception as e:
+                if "duplicate" in str(e).lower() or "unique" in str(e).lower():
+                    client.table("url_registry").update({
+                        "source_name": current_source_type, "added_by": seed_marker,
+                        "course_name": course_name,
+                    }).eq("url", url).execute()
+                    results["urls"] += 1
+    except Exception as e:
+        results["errors"].append(f"URLs tab: {e}")
+
+    # 2. Course Outline tab — try common names
+    outline_tab = None
+    for tab in [f"{course_name} Course Outline", "Course Outline", f"React Course Outline"]:
+        try:
+            rows = _fetch_sheet_csv(spreadsheet_id, tab)
+            if rows:
+                outline_tab = tab
+                break
+        except Exception:
+            continue
+
+    if outline_tab:
+        try:
+            rows = _fetch_sheet_csv(spreadsheet_id, outline_tab) if outline_tab != tab else rows
+            current_module = ""
+            for row in rows:
+                module = row.get("Module Name", "")
+                session_name = row.get("Session Name", "")
+                key_takeaways = row.get("Key Takeaways", "")
+                outline = row.get("Outline", "")
+                if module:
+                    current_module = module
+                if not session_name:
+                    continue
+                content = f"{key_takeaways}\n\n{outline}" if outline else key_takeaways
+                try:
+                    client.table("curriculum_documents").insert({
+                        "document_type": "session", "title": session_name, "content": content,
+                        "course_name": course_name, "module_name": current_module,
+                        "session_name": session_name, "tools": [],
+                        "metadata": {"seeded_by": seed_marker}, "is_active": True,
+                    }).execute()
+                    results["sessions"] += 1
+                except Exception as e:
+                    if "duplicate" in str(e).lower():
+                        client.table("curriculum_documents").update({
+                            "content": content, "course_name": course_name,
+                            "module_name": current_module, "metadata": {"seeded_by": seed_marker},
+                        }).eq("title", session_name).execute()
+                        results["sessions"] += 1
+        except Exception as e:
+            results["errors"].append(f"Course Outline tab: {e}")
+
+    # 3. Projects
+    try:
+        rows = _fetch_sheet_csv(spreadsheet_id, "Projects Used")
+        for row in rows:
+            name = row.get("Project Name", "")
+            if not name:
+                continue
+            tools_str = row.get("Tools Used", "")
+            tools = [t.strip() for t in tools_str.split(",") if t.strip()] if tools_str else []
+            content_parts = [f"Project: {name}"]
+            for k in ["Session Mapping", "Concepts Practiced", "Tools Used", "Remarks"]:
+                if row.get(k):
+                    content_parts.append(f"{k}: {row[k]}")
+            try:
+                client.table("curriculum_documents").insert({
+                    "document_type": "project", "title": name, "content": "\n".join(content_parts),
+                    "course_name": course_name, "tools": tools,
+                    "metadata": {"seeded_by": seed_marker}, "is_active": True,
+                }).execute()
+                results["projects"] += 1
+            except Exception as e:
+                if "duplicate" in str(e).lower():
+                    results["projects"] += 1
+    except Exception as e:
+        results["errors"].append(f"Projects tab: {e}")
+
+    # 4. Practice Content
+    try:
+        rows = _fetch_sheet_csv(spreadsheet_id, "Practice Content")
+        for row in rows:
+            session_name = row.get("Session Name", "")
+            if not session_name:
+                continue
+            cheatsheet = row.get("Cheatsheet/Coding practice", "") or row.get("Cheatsheet/ Coding practice", "")
+            title = f"Practice: {session_name}"
+            content = f"Practice content for session: {session_name}\n{cheatsheet}" if cheatsheet else f"Practice content for session: {session_name}"
+            try:
+                client.table("curriculum_documents").insert({
+                    "document_type": "coding_challenge", "title": title, "content": content,
+                    "course_name": course_name, "session_name": session_name,
+                    "metadata": {"seeded_by": seed_marker}, "is_active": True,
+                }).execute()
+                results["practice"] += 1
+            except Exception as e:
+                if "duplicate" in str(e).lower():
+                    results["practice"] += 1
+    except Exception as e:
+        results["errors"].append(f"Practice tab: {e}")
+
+    # 5. Quiz Content
+    try:
+        rows = _fetch_sheet_csv(spreadsheet_id, "Quiz Content")
+        for row in rows:
+            session_name = row.get("Session Name", "")
+            if not session_name:
+                continue
+            mcq = row.get("MCQ practice", "") or row.get("MCQ Practice", "")
+            title = f"Quiz: {session_name}"
+            content = f"Quiz for session: {session_name}\n{mcq}" if mcq else f"Quiz for session: {session_name}"
+            try:
+                client.table("curriculum_documents").insert({
+                    "document_type": "quiz", "title": title, "content": content,
+                    "course_name": course_name, "session_name": session_name,
+                    "metadata": {"seeded_by": seed_marker}, "is_active": True,
+                }).execute()
+                results["quizzes"] += 1
+            except Exception as e:
+                if "duplicate" in str(e).lower():
+                    results["quizzes"] += 1
+    except Exception as e:
+        results["errors"].append(f"Quiz tab: {e}")
+
+    # 6. Gap Analysis Output
+    try:
+        rows = _fetch_sheet_csv(spreadsheet_id, "Gap Analysis Output")
+        for row in rows:
+            area = row.get("Area", "")
+            gap_statement = row.get("Gap", "")
+            if not area or not gap_statement:
+                continue
+            severity_raw = row.get("Severity", "medium").strip().lower()
+            severity = severity_raw if severity_raw in ("critical", "high", "medium", "low") else "medium"
+            confidence_map = {"high": 0.85, "medium": 0.6, "low": 0.3}
+            confidence = confidence_map.get(row.get("Confidence", "medium").strip().lower(), 0.6)
+            try:
+                client.table("curriculum_gaps").insert({
+                    "gap_type": "design_gap", "market_signal": row.get("Market Standard", ""),
+                    "curriculum_evidence": row.get("Current Curriculum Evidence", ""),
+                    "gap_statement": gap_statement, "what_to_act": row.get("Recommendation", ""),
+                    "why_to_act": f"Market standard: {row.get('Market Standard', '')}",
+                    "severity": severity, "impacted_content_area": area,
+                    "confidence": confidence, "decision_status": "pending_review",
+                    "evidence_source": seed_marker,
+                }).execute()
+                results["gaps"] += 1
+            except Exception as e:
+                if "duplicate" in str(e).lower():
+                    results["gaps"] += 1
+    except Exception as e:
+        results["errors"].append(f"Gaps tab: {e}")
+
+    total = sum(v for k, v in results.items() if k != "errors")
+    return {"total_records": total, "course_name": course_name, "product_name": product_name, **results}

@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import {
   useKBHierarchy, useKBStats, useKBCourses, useKBConnections, useSessionContent,
+  useSheetConfigs, useLoadFromSheet, useDeleteSheetConfig,
   type KBCourse, type KBModule, type KBSession, type KBNode, type KBEdge, type KBSkillCluster,
+  type SheetConfig,
 } from '@/hooks/useKnowledgeBase'
 import {
   BookOpen, Layers, FileText, ChevronRight, ChevronDown,
   Code2, BookOpenCheck, HelpCircle, Tag, BarChart3,
   Loader2, ArrowRight, Network, Link as LinkIcon, Brain,
-  CheckCircle2, XCircle,
+  CheckCircle2, XCircle, Sheet, Trash2, Plus,
 } from 'lucide-react'
 
 const PRODUCTS = ['NIAT']
@@ -347,6 +349,120 @@ function ModuleCard({ module }: { module: KBModule }) {
   )
 }
 
+function SheetLoaderPanel({ product }: { product: string }) {
+  const { data: configs } = useSheetConfigs(product)
+  const loadFromSheet = useLoadFromSheet()
+  const deleteConfig = useDeleteSheetConfig()
+  const [showForm, setShowForm] = useState(false)
+  const [courseName, setCourseName] = useState('')
+  const [sheetUrl, setSheetUrl] = useState('')
+  const [result, setResult] = useState<{ total_records: number; course_name: string; errors: string[] } | null>(null)
+
+  const handleLoad = async () => {
+    if (!courseName || !sheetUrl) return
+    try {
+      const res = await loadFromSheet.mutateAsync({ product_name: product, course_name: courseName, sheet_url: sheetUrl })
+      setResult(res)
+      setCourseName('')
+      setSheetUrl('')
+      setShowForm(false)
+    } catch {
+      setResult(null)
+    }
+  }
+
+  const handleReload = async (cfg: SheetConfig) => {
+    try {
+      const res = await loadFromSheet.mutateAsync({ product_name: cfg.product_name, course_name: cfg.course_name, sheet_url: cfg.sheet_url })
+      setResult(res)
+    } catch {
+      setResult(null)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white shadow-card overflow-hidden">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-emerald-50/50 to-white">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100">
+            <Sheet className="h-5 w-5 text-emerald-600" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Course Data Sources</h3>
+            <p className="text-xs text-slate-400">Load knowledge base from Google Sheets per course</p>
+          </div>
+        </div>
+        <button onClick={() => setShowForm(!showForm)}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-[12px] font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
+          <Plus className="h-3.5 w-3.5" /> Add Course Sheet
+        </button>
+      </div>
+
+      {/* Existing configs */}
+      {(configs ?? []).length > 0 && (
+        <div className="divide-y divide-slate-100">
+          {(configs ?? []).map(cfg => (
+            <div key={cfg.id} className="flex items-center gap-4 px-6 py-3 hover:bg-slate-50/50 transition">
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-semibold text-slate-800">{cfg.course_name}</p>
+                <p className="text-[11px] text-slate-400 truncate">{cfg.sheet_url}</p>
+              </div>
+              {cfg.last_loaded_at && (
+                <span className="text-[10px] text-slate-400 flex-shrink-0">
+                  Loaded {new Date(cfg.last_loaded_at).toLocaleDateString()}
+                </span>
+              )}
+              <button onClick={() => handleReload(cfg)} disabled={loadFromSheet.isPending}
+                className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-50">
+                {loadFromSheet.isPending ? 'Loading...' : 'Reload'}
+              </button>
+              <button onClick={() => deleteConfig.mutate(cfg.id)}
+                className="rounded-lg p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 transition">
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* New course form */}
+      {showForm && (
+        <div className="border-t border-slate-100 px-6 py-4 bg-slate-50/30">
+          <div className="flex items-end gap-3">
+            <div className="w-48">
+              <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Course Name</label>
+              <input value={courseName} onChange={e => setCourseName(e.target.value)}
+                placeholder="e.g. React JS" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+            </div>
+            <div className="flex-1">
+              <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Google Sheet URL</label>
+              <input value={sheetUrl} onChange={e => setSheetUrl(e.target.value)}
+                placeholder="https://docs.google.com/spreadsheets/d/..." className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+            </div>
+            <button onClick={handleLoad} disabled={!courseName || !sheetUrl || loadFromSheet.isPending}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-5 py-2 text-[12px] font-semibold text-white shadow-sm hover:bg-emerald-700 transition disabled:opacity-50">
+              {loadFromSheet.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sheet className="h-3.5 w-3.5" />}
+              Load
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Result feedback */}
+      {result && (
+        <div className="border-t border-slate-100 px-6 py-3 bg-emerald-50/50">
+          <p className="text-[12px] font-semibold text-emerald-700">
+            Loaded {result.total_records} records for "{result.course_name}"
+          </p>
+          {result.errors.length > 0 && (
+            <p className="text-[11px] text-amber-600 mt-1">Skipped tabs: {result.errors.length}</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function KnowledgeBase() {
   const [product, setProduct] = useState(PRODUCTS[0])
   const [selectedCourseId, setSelectedCourseId] = useState<string>('')
@@ -425,6 +541,9 @@ export default function KnowledgeBase() {
           </div>
         </div>
       </div>
+
+      {/* Sheet Loader */}
+      <SheetLoaderPanel product={product} />
 
       {/* Loading */}
       {isLoading && (

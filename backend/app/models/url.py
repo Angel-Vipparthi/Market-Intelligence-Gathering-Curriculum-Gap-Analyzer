@@ -10,6 +10,7 @@ class URLCreate(BaseModel):
     category: Optional[str] = None
     tags: list[str] = []
     source_name: Optional[str] = None
+    course_name: Optional[str] = None
 
 
 class URLResponse(BaseModel):
@@ -24,6 +25,7 @@ class URLResponse(BaseModel):
     last_crawled_at: Optional[datetime] = None
     crawl_frequency: Optional[str] = None
     added_by: Optional[str] = None
+    course_name: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

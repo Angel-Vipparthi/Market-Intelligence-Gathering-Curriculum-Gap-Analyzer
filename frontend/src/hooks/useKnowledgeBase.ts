@@ -289,3 +289,55 @@ export function useDeleteSession() {
     },
   })
 }
+
+export interface SheetConfig {
+  id: string
+  product_name: string
+  course_name: string
+  sheet_url: string
+  spreadsheet_id: string
+  last_loaded_at: string | null
+}
+
+export function useSheetConfigs(productName?: string) {
+  return useQuery({
+    queryKey: ['kb-sheet-configs', productName],
+    queryFn: async () => {
+      const params: Record<string, string> = {}
+      if (productName) params.product_name = productName
+      const { data } = await api.get('/kb/sheet-configs', { params })
+      return data.items as SheetConfig[]
+    },
+  })
+}
+
+export function useLoadFromSheet() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: { product_name: string; course_name: string; sheet_url: string }) => {
+      const { data } = await api.post('/kb/load-from-sheet', payload)
+      return data as { total_records: number; course_name: string; errors: string[] }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['kb-sheet-configs'] })
+      qc.invalidateQueries({ queryKey: ['kb-courses'] })
+      qc.invalidateQueries({ queryKey: ['kb-hierarchy'] })
+      qc.invalidateQueries({ queryKey: ['kb-stats'] })
+      qc.invalidateQueries({ queryKey: ['kb-products'] })
+      qc.invalidateQueries({ queryKey: ['urls'] })
+    },
+  })
+}
+
+export function useDeleteSheetConfig() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (configId: string) => {
+      const { data } = await api.delete(`/kb/sheet-configs/${configId}`)
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['kb-sheet-configs'] })
+    },
+  })
+}

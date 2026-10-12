@@ -33,7 +33,7 @@ function ProgressModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={allDone ? onClose : undefined} />
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-2xl mx-4 rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-white">
@@ -52,11 +52,9 @@ function ProgressModal({
               </p>
             </div>
           </div>
-          {allDone && (
-            <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition">
-              <X className="h-4 w-4" />
-            </button>
-          )}
+          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition" title={allDone ? 'Close' : 'Run in background'}>
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Progress Bar */}
@@ -159,9 +157,13 @@ function ProgressModal({
             <span><span className="font-bold text-slate-500">{progress?.items?.filter((i: BatchItem) => i.status === 'done' && i.curriculum_relevant !== 'Yes').length ?? 0}</span> not relevant</span>
             <span><span className="font-bold text-indigo-500">{(progress?.total ?? 0) - (progress?.completed ?? 0)}</span> remaining</span>
           </div>
-          {allDone && (
+          {allDone ? (
             <button onClick={onClose} className="rounded-lg bg-indigo-600 px-4 py-1.5 text-[12px] font-semibold text-white shadow-sm hover:bg-indigo-700 transition active:scale-[0.98]">
               Close & Review
+            </button>
+          ) : (
+            <button onClick={onClose} className="rounded-lg border border-slate-300 bg-white px-4 py-1.5 text-[12px] font-semibold text-slate-600 shadow-sm hover:bg-slate-50 transition active:scale-[0.98]">
+              Run in Background
             </button>
           )}
         </div>

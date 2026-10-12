@@ -31,6 +31,7 @@ async def create_url(payload: URLCreate):
         "category": payload.category,
         "tags": payload.tags,
         "source_name": payload.source_name,
+        "course_name": payload.course_name,
         "is_active": True,
     }
 
@@ -56,6 +57,7 @@ async def create_url(payload: URLCreate):
 async def list_urls(
     category: str | None = Query(None, description="Filter by category"),
     is_active: bool | None = Query(None, description="Filter by active status"),
+    course_name: str | None = Query(None, description="Filter by course name"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
@@ -68,6 +70,8 @@ async def list_urls(
         query = query.eq("category", category)
     if is_active is not None:
         query = query.eq("is_active", is_active)
+    if course_name is not None:
+        query = query.eq("course_name", course_name)
 
     query = query.order("created_at", desc=True).range(offset, offset + limit - 1)
 
@@ -84,6 +88,15 @@ async def list_urls(
         items=[URLResponse(**row) for row in result.data],
         total=result.count or len(result.data),
     )
+
+
+@router.get("/courses")
+async def list_url_courses():
+    """Get distinct course names from url_registry."""
+    client = get_supabase_client()
+    result = client.table("url_registry").select("course_name").not_.is_("course_name", "null").execute()
+    courses = sorted(set(r["course_name"] for r in (result.data or []) if r.get("course_name")))
+    return {"items": courses}
 
 
 @router.get("/{url_id}", response_model=URLResponse)
@@ -153,6 +166,7 @@ async def bulk_import_urls(urls: list[URLCreate]):
                 "category": url_entry.category,
                 "tags": url_entry.tags,
                 "source_name": url_entry.source_name,
+                "course_name": url_entry.course_name,
                 "is_active": True,
             }
         )

@@ -69,7 +69,7 @@ def seed():
                     "available_options": options,
                     "parent_title": parent_title,
                     "parent_description": parent_desc,
-                    "total_max_score": total_max_score,
+                    "total_max_score": int(float(total_max_score)) if total_max_score is not None else None,
                 })
 
                 options_text = " | ".join(o.get("content", "") for o in options)
